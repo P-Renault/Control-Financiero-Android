@@ -1,55 +1,31 @@
-# Control Financiero — Android APK B1.4
+# Control Financiero — Android B1.5
 
-## Corrección del workflow
+Proyecto Android mínimo para generar el APK de Control Financiero mediante GitHub Actions.
 
-La ejecución B1.3 falló con:
+## Qué cambia en B1.5
 
-`Process completed with exit code 127`
+- Elimina completamente los recursos XML propios de `res/` para evitar errores por archivos renombrados como `1.txt` al cargar el proyecto desde el navegador de GitHub.
+- La interfaz se crea directamente desde Kotlin.
+- El tema e icono usan recursos nativos de Android.
+- Mantiene la aplicación como un wrapper WebView de `https://controlfinanciero.cl/`.
+- Mantiene Supabase, autenticación y lógica financiera en el sistema web de producción.
+- Mantiene el workflow B1.4 que evita `sdkmanager` y compila con Android SDK del runner.
 
-en el paso `Set up Android SDK`.
-
-La causa fue la llamada a `sdkmanager`, que no estaba disponible en el PATH del runner.
-
-B1.4 elimina completamente esa llamada. El workflow usa directamente el Android SDK preinstalado por GitHub en `ubuntu-24.04` y verifica que exista Android platform 35 antes de compilar.
-
-## Despliegue
-
-Sube TODO el contenido de este ZIP a la raíz del repositorio `Control-Financiero-Android`, reemplazando el contenido anterior.
-
-Estructura:
+## Estructura
 
 ```text
 .github/workflows/android.yml
-app/
+app/build.gradle.kts
+app/src/main/AndroidManifest.xml
+app/src/main/java/cl/controlfinanciero/app/MainActivity.kt
 build.gradle.kts
 gradle.properties
 settings.gradle.kts
 README-ANDROID-APK-INTEGRATION.md
 ```
 
-Luego:
+## GitHub
 
-1. GitHub → Actions.
-2. Build Control Financiero APK.
-3. Run workflow.
-4. Esperar el resultado.
-5. Si termina verde, abrir Artifacts.
-6. Descargar `Control-Financiero-APK`.
+Subir el contenido de este ZIP directamente a la raíz de `P-Renault/Control-Financiero-Android`. No crear una carpeta intermedia `CCF-ANDROID-B1.5-src`.
 
-No ejecutes `sdkmanager` manualmente.
-No agregues `android-actions/setup-android`.
-No cambies el proyecto web ni Supabase.
-
-## Release
-
-Para publicar automáticamente el APK en GitHub Releases, crea un tag:
-
-`v1.0.0`
-
-y súbelo al repositorio.
-
-## APK
-
-La compilación genera una versión debug para pruebas directas en Android.
-
-Una vez validada, se puede generar una versión release firmada para distribución.
+Después: Actions → Build Control Financiero APK → Run workflow.
