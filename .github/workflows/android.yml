@@ -12,7 +12,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,27 +22,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # GitHub-hosted Android runners already include the Android SDK,
-      # platform 35 and compatible build tools. Do not invoke sdkmanager:
-      # the previous workflow failed with exit code 127 because sdkmanager
-      # was not on PATH.
       - name: Verify Android SDK
         shell: bash
         run: |
           set -e
-          echo "ANDROID_HOME=${ANDROID_HOME:-}"
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
-          if [ -z "${ANDROID_HOME:-}" ] && [ -n "${ANDROID_SDK_ROOT:-}" ]; then
-            export ANDROID_HOME="$ANDROID_SDK_ROOT"
-          fi
-          if [ -z "${ANDROID_HOME:-}" ]; then
-            echo "ANDROID_HOME/ANDROID_SDK_ROOT not available on runner"
-            exit 1
-          fi
-          echo "Android SDK: $ANDROID_HOME"
-          test -d "$ANDROID_HOME/platforms/android-35"
-          test -d "$ANDROID_HOME/build-tools"
-          echo "Android platform 35 is available."
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK"
+          echo "Android SDK: $SDK"
+          test -d "$SDK/platforms/android-35"
+          echo "Android platform 35 available."
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -57,8 +44,9 @@ jobs:
         shell: bash
         run: |
           set -e
-          find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print
-          test -n "$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          APK="$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -n "$APK"
+          echo "APK generated: $APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
