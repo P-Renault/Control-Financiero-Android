@@ -1,17 +1,18 @@
-# Control Financiero — Android B1.5
+# Control Financiero — Android APK B1.7
 
-Proyecto Android mínimo para generar el APK de Control Financiero mediante GitHub Actions.
+Wrapper Android para `https://controlfinanciero.cl/`.
 
-## Qué cambia en B1.5
+## Objetivo de B1.7
 
-- Elimina completamente los recursos XML propios de `res/` para evitar errores por archivos renombrados como `1.txt` al cargar el proyecto desde el navegador de GitHub.
-- La interfaz se crea directamente desde Kotlin.
-- El tema e icono usan recursos nativos de Android.
-- Mantiene la aplicación como un wrapper WebView de `https://controlfinanciero.cl/`.
-- Mantiene Supabase, autenticación y lógica financiera en el sistema web de producción.
-- Mantiene el workflow B1.4 que evita `sdkmanager` y compila con Android SDK del runner.
+La primera pantalla de la aplicación debe ser el login real del sistema CCF (el `ccf-auth-gate` existente), no el landing público.
 
-## Estructura
+`MainActivity.kt` carga el sitio productivo y activa el botón existente `data-b230-open="login"`. No se duplica la autenticación ni se modifica Supabase.
+
+## Corrección B1.7
+
+El workflow verifica los archivos fundamentales y, si por una carga manual desde Android falta `app/src/main/AndroidManifest.xml`, lo crea automáticamente antes de ejecutar Gradle. Esto evita el error de `processDebugMainManifest` por manifiesto inexistente.
+
+## Estructura raíz
 
 ```text
 .github/workflows/android.yml
@@ -24,8 +25,10 @@ settings.gradle.kts
 README-ANDROID-APK-INTEGRATION.md
 ```
 
-## GitHub
+No se requiere carpeta `res/`.
 
-Subir el contenido de este ZIP directamente a la raíz de `P-Renault/Control-Financiero-Android`. No crear una carpeta intermedia `CCF-ANDROID-B1.5-src`.
+## Compilación
 
-Después: Actions → Build Control Financiero APK → Run workflow.
+GitHub Actions → **Build Control Financiero APK** → **Run workflow**.
+
+El Artifact generado es `Control-Financiero-APK` y contiene `app-debug.apk`.
