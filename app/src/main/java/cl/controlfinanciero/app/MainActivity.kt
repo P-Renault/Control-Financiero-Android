@@ -30,6 +30,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.setBackgroundDrawableResource(android.R.color.black)
 
         webView = WebView(this)
         webView.setBackgroundColor(Color.rgb(5, 11, 20))
@@ -79,6 +80,7 @@ class MainActivity : Activity() {
                 super.onPageFinished(view, url)
                 pageReady = true
                 webView.visibility = View.INVISIBLE
+                webView.evaluateJavascript("document.getElementById('app')?.classList.add('hidden'); document.body?.classList.add('ccf-android-startup-lock');", null)
                 forceLoginBoot()
             }
 
@@ -133,10 +135,10 @@ class MainActivity : Activity() {
                       display:flex;align-items:center;justify-content:center;
                       background:#050b14;color:#fff;font:600 15px system-ui;
                     }
-                    #app.ccf-android-compact{zoom:.88 !important;}
+                    #app.ccf-android-compact{zoom:.92 !important;}
                     @supports not (zoom:.88){
                       #app.ccf-android-compact{
-                        transform:scale(.88);transform-origin:top left;width:113.637%;
+                        transform:scale(.92);transform-origin:top left;width:108.696%;
                       }
                     }
                   `;
@@ -200,12 +202,13 @@ class MainActivity : Activity() {
 
         webView.evaluateJavascript(
             """
-            (function(){
+            (async function(){
               var gate=document.getElementById('ccf-auth-gate');
               var loading=document.getElementById('ccf-android-startup-loading');
               var app=document.getElementById('app');
-              var appHidden = app && (app.classList.contains('hidden') || getComputedStyle(app).display === 'none' || getComputedStyle(app).visibility === 'hidden');
 
+              // RULE 1: if the real production auth gate exists, this is the
+              // correct startup state. Show ONLY the login portal.
               if(gate){
                 if(loading) loading.remove();
                 document.body.classList.remove('ccf-android-startup-lock');
@@ -213,16 +216,34 @@ class MainActivity : Activity() {
                 return 'login';
               }
 
-              if(app && !appHidden){
+              // RULE 2: never expose the landing/app merely because #app is
+              // visible in the raw HTML. The production auth boot can reveal
+              // #app before its gate is fully installed. We only expose the
+              // financial system when Supabase confirms a real active session.
+              var session=null;
+              try{
+                var client=window.supabaseClient || window.db || window.__db;
+                if(client && client.auth && client.auth.getSession){
+                  var r=await client.auth.getSession();
+                  session=r && r.data && r.data.session ? r.data.session : null;
+                }
+              }catch(e){}
+
+              if(session){
                 if(loading) loading.remove();
                 document.body.classList.remove('ccf-android-startup-lock');
-                app.classList.add('ccf-android-compact');
+                if(app){
+                  app.classList.remove('hidden');
+                  app.classList.add('ccf-android-compact');
+                }
                 return 'app';
               }
 
-              // No login gate and no visible app normally means the production
-              // landing page is showing (for example after logout). The native
-              // side will re-boot the REAL auth portal instead of exposing it.
+              // No gate + no authenticated session = landing/unauthenticated
+              // state. Keep WebView hidden and restart the REAL auth boot.
+              if(loading) loading.remove();
+              document.body.classList.add('ccf-android-startup-lock');
+              if(app) app.classList.add('hidden');
               return 'landing';
             })();
             """.trimIndent(),
@@ -235,13 +256,14 @@ class MainActivity : Activity() {
                 }
                 "landing" -> {
                     webView.visibility = View.INVISIBLE
-                    forceLoginBoot()
+                    if (!bootInProgress) forceLoginBoot()
                 }
             }
         }
 
-        // Keep a lightweight state check alive so a later successful login or
-        // logout is handled without ever exposing the production landing page.
+        // Polling is intentionally lightweight. It handles the transition
+        // login -> authenticated app and also logout -> login without ever
+        // exposing the production landing page.
         handler.postDelayed({ verifyLoginPortal() }, 700L)
     }
 
@@ -257,7 +279,7 @@ class MainActivity : Activity() {
               if(!gate){
                 if(loading) loading.remove();
                 document.body.classList.remove('ccf-android-startup-lock');
-                if(app) app.classList.add('ccf-android-compact');
+                if(app){ app.classList.remove('hidden'); app.classList.add('ccf-android-compact'); }
               }
               return !!gate;
             })();
