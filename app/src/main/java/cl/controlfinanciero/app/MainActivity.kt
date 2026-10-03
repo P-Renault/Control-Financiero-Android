@@ -91,7 +91,7 @@ class MainActivity : Activity() {
 
         emailInput = EditText(this).apply {
             hint = "Correo electrónico"
-            hintTextColor = Color.rgb(130, 155, 175)
+            setHintTextColor(Color.rgb(130, 155, 175))
             setTextColor(Color.WHITE)
             textSize = 15f
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
@@ -103,7 +103,7 @@ class MainActivity : Activity() {
 
         passwordInput = EditText(this).apply {
             hint = "Contraseña"
-            hintTextColor = Color.rgb(130, 155, 175)
+            setHintTextColor(Color.rgb(130, 155, 175))
             setTextColor(Color.WHITE)
             textSize = 15f
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
