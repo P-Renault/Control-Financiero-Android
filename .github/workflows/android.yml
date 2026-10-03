@@ -3,11 +3,7 @@ name: Build Control Financiero APK
 on:
   workflow_dispatch:
   push:
-    tags:
-      - 'v*'
-
-permissions:
-  contents: write
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -22,15 +18,48 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Ensure Android project files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/build.gradle.kts
+          test -f app/src/main/java/cl/controlfinanciero/app/MainActivity.kt
+          mkdir -p app/src/main
+          if [ ! -f app/src/main/AndroidManifest.xml ]; then
+            echo "AndroidManifest.xml no estaba presente; creando el manifiesto estándar del APK."
+            cat > app/src/main/AndroidManifest.xml <<'MANIFEST'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <application
+                  android:allowBackup="false"
+                  android:icon="@android:drawable/sym_def_app_icon"
+                  android:label="Control Financiero"
+                  android:roundIcon="@android:drawable/sym_def_app_icon"
+                  android:supportsRtl="true"
+                  android:theme="@android:style/Theme.Material.Light.NoActionBar"
+                  android:usesCleartextTraffic="false">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="portrait">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          MANIFEST
+          fi
+          test -f app/src/main/AndroidManifest.xml
+          echo "Android project files OK"
+
       - name: Verify Android SDK
         shell: bash
         run: |
-          set -e
-          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
-          test -n "$SDK"
-          echo "Android SDK: $SDK"
-          test -d "$SDK/platforms/android-35"
-          echo "Android platform 35 available."
+          set -euo pipefail
+          test -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}/platforms/android-35"
+          test -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -43,21 +72,19 @@ jobs:
       - name: Verify APK
         shell: bash
         run: |
-          set -e
-          APK="$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)"
-          test -n "$APK"
-          echo "APK generated: $APK"
+          set -euo pipefail
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Control-Financiero-APK
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
       - name: Publish APK to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/*.apk
-          generate_release_notes: true
+          files: app/build/outputs/apk/debug/app-debug.apk
