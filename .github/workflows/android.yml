@@ -25,34 +25,11 @@ jobs:
           test -f app/build.gradle.kts
           test -f app/src/main/java/cl/controlfinanciero/app/MainActivity.kt
           mkdir -p app/src/main
-          if [ ! -f app/src/main/AndroidManifest.xml ]; then
-            echo "AndroidManifest.xml no estaba presente; creando el manifiesto estándar del APK."
-            cat > app/src/main/AndroidManifest.xml <<'MANIFEST'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET" />
-              <application
-                  android:allowBackup="false"
-                  android:icon="@android:drawable/sym_def_app_icon"
-                  android:label="Control Financiero"
-                  android:roundIcon="@android:drawable/sym_def_app_icon"
-                  android:supportsRtl="true"
-                  android:theme="@android:style/Theme.Material.Light.NoActionBar"
-                  android:usesCleartextTraffic="false">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:screenOrientation="portrait">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          MANIFEST
-          fi
           test -f app/src/main/AndroidManifest.xml
-          echo "Android project files OK"
+          test -f app/src/main/res/drawable/ccf_logo.png
+          test -f app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          test -f app/src/main/res/mipmap-nodpi/ic_launcher.png
+          echo "Android project files and CCF logo OK"
 
       - name: Verify Android SDK
         shell: bash
