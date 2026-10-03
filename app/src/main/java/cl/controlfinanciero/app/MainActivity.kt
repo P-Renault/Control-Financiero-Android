@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
+import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -24,6 +25,7 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private var bootAttempts = 0
     private var pageReady = false
+    private var bootInProgress = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +33,10 @@ class MainActivity : Activity() {
 
         webView = WebView(this)
         webView.setBackgroundColor(Color.rgb(5, 11, 20))
+        // Keep the WebView hidden until the REAL CCF login portal or an already
+        // authenticated app is detected. This prevents the Somos Software
+        // landing/logo from ever flashing during APK startup.
+        webView.visibility = View.INVISIBLE
         webView.layoutParams = ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
@@ -72,6 +78,7 @@ class MainActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
                 pageReady = true
+                webView.visibility = View.INVISIBLE
                 forceLoginBoot()
             }
 
@@ -92,9 +99,9 @@ class MainActivity : Activity() {
      * landing/app and explicitly boot CCF-AUTH-BOOT-FINAL.js.
      */
     private fun forceLoginBoot() {
-        if (!pageReady || isFinishing || isDestroyed) return
+        if (!pageReady || isFinishing || isDestroyed || bootInProgress) return
         bootAttempts = 0
-        handler.removeCallbacksAndMessages(null)
+        bootInProgress = true
         injectAuthBoot()
     }
 
@@ -126,10 +133,10 @@ class MainActivity : Activity() {
                       display:flex;align-items:center;justify-content:center;
                       background:#050b14;color:#fff;font:600 15px system-ui;
                     }
-                    #app.ccf-android-compact{zoom:.90 !important;}
-                    @supports not (zoom:.9){
+                    #app.ccf-android-compact{zoom:.88 !important;}
+                    @supports not (zoom:.88){
                       #app.ccf-android-compact{
-                        transform:scale(.90);transform-origin:top left;width:111.111%;
+                        transform:scale(.88);transform-origin:top left;width:113.637%;
                       }
                     }
                   `;
@@ -185,6 +192,7 @@ class MainActivity : Activity() {
         )
 
         handler.postDelayed({ verifyLoginPortal() }, 350L)
+        handler.postDelayed({ bootInProgress = false }, 5000L)
     }
 
     private fun verifyLoginPortal() {
@@ -196,26 +204,50 @@ class MainActivity : Activity() {
               var gate=document.getElementById('ccf-auth-gate');
               var loading=document.getElementById('ccf-android-startup-loading');
               var app=document.getElementById('app');
+              var appHidden = app && (app.classList.contains('hidden') || getComputedStyle(app).display === 'none' || getComputedStyle(app).visibility === 'hidden');
+
               if(gate){
                 if(loading) loading.remove();
                 document.body.classList.remove('ccf-android-startup-lock');
                 if(app) app.classList.add('hidden');
                 return 'login';
               }
-              return 'waiting';
+
+              if(app && !appHidden){
+                if(loading) loading.remove();
+                document.body.classList.remove('ccf-android-startup-lock');
+                app.classList.add('ccf-android-compact');
+                return 'app';
+              }
+
+              // No login gate and no visible app normally means the production
+              // landing page is showing (for example after logout). The native
+              // side will re-boot the REAL auth portal instead of exposing it.
+              return 'landing';
             })();
             """.trimIndent(),
-            null
-        )
-
-        if (bootAttempts < 40) {
-            bootAttempts++
-            handler.postDelayed({ verifyLoginPortal() }, 500L)
+        ) { result ->
+            when (result?.trim('"')) {
+                "login", "app" -> {
+                    bootInProgress = false
+                    webView.visibility = View.VISIBLE
+                    if (result.trim('"') == "app") applyCompactAfterLogin()
+                }
+                "landing" -> {
+                    webView.visibility = View.INVISIBLE
+                    forceLoginBoot()
+                }
+            }
         }
+
+        // Keep a lightweight state check alive so a later successful login or
+        // logout is handled without ever exposing the production landing page.
+        handler.postDelayed({ verifyLoginPortal() }, 700L)
     }
 
     private fun applyCompactAfterLogin() {
         if (isFinishing || isDestroyed) return
+        webView.visibility = View.VISIBLE
         webView.evaluateJavascript(
             """
             (function(){
