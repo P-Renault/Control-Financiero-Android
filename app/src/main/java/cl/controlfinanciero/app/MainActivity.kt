@@ -177,7 +177,8 @@ class MainActivity : Activity() {
               }
               return 'guarded';
             })();
-            """.trimIndent()
+            """.trimIndent(),
+            null
         )
     }
 
