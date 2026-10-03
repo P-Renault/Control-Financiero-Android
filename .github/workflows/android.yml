@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -23,18 +23,27 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # GitHub-hosted Ubuntu runners already provide Android SDK.
-      # We deliberately do not use android-actions/setup-android here,
-      # because that action attempted to install the obsolete "tools" package.
-      - name: Configure Android SDK
+      # GitHub-hosted Android runners already include the Android SDK,
+      # platform 35 and compatible build tools. Do not invoke sdkmanager:
+      # the previous workflow failed with exit code 127 because sdkmanager
+      # was not on PATH.
+      - name: Verify Android SDK
         shell: bash
         run: |
           set -e
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager --install             "platform-tools"             "platforms;android-35"             "build-tools;35.0.0"
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
+          if [ -z "${ANDROID_HOME:-}" ] && [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+            export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          fi
+          if [ -z "${ANDROID_HOME:-}" ]; then
+            echo "ANDROID_HOME/ANDROID_SDK_ROOT not available on runner"
+            exit 1
+          fi
+          echo "Android SDK: $ANDROID_HOME"
+          test -d "$ANDROID_HOME/platforms/android-35"
+          test -d "$ANDROID_HOME/build-tools"
+          echo "Android platform 35 is available."
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -42,14 +51,14 @@ jobs:
           gradle-version: '8.10'
 
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
+        run: gradle --no-daemon assembleDebug --stacktrace
 
       - name: Verify APK
         shell: bash
         run: |
           set -e
-          ls -lh app/build/outputs/apk/debug/
-          test -n "$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)"
+          find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print
+          test -n "$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name '*.apk' -print -quit)"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
