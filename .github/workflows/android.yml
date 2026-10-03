@@ -23,12 +23,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK components
+      # GitHub-hosted Ubuntu runners already provide Android SDK.
+      # We deliberately do not use android-actions/setup-android here,
+      # because that action attempted to install the obsolete "tools" package.
+      - name: Configure Android SDK
+        shell: bash
         run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          set -e
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager --install             "platform-tools"             "platforms;android-35"             "build-tools;35.0.0"
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -37,6 +43,13 @@ jobs:
 
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -e
+          ls -lh app/build/outputs/apk/debug/
+          test -n "$(find app/build/outputs/apk/debug -name '*.apk' -print -quit)"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
