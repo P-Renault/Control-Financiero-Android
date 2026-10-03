@@ -1,46 +1,55 @@
-# Control Financiero — Android APK B1.0
+# Control Financiero — Android APK B1.4
 
-## Qué es
+## Corrección del workflow
 
-Aplicación Android ligera que ejecuta la versión de producción de Control Financiero dentro de un WebView seguro:
+La ejecución B1.3 falló con:
 
-`https://controlfinanciero.cl/`
+`Process completed with exit code 127`
 
-No duplica la lógica financiera ni la base de datos. Supabase continúa siendo el backend de producción.
+en el paso `Set up Android SDK`.
 
-## Compilación
+La causa fue la llamada a `sdkmanager`, que no estaba disponible en el PATH del runner.
 
-El proyecto está preparado para GitHub Actions.
+B1.4 elimina completamente esa llamada. El workflow usa directamente el Android SDK preinstalado por GitHub en `ubuntu-24.04` y verifica que exista Android platform 35 antes de compilar.
 
-1. Crear/subir este proyecto a un repositorio GitHub.
-2. Ir a **Actions**.
-3. Ejecutar **Build Control Financiero APK** con `workflow_dispatch`.
-4. Descargar el artefacto `Control-Financiero-Android`.
-5. Instalar `Control-Financiero.apk` en Android.
+## Despliegue
 
-Para publicar automáticamente una descarga en GitHub Releases, crear un tag como:
+Sube TODO el contenido de este ZIP a la raíz del repositorio `Control-Financiero-Android`, reemplazando el contenido anterior.
+
+Estructura:
+
+```text
+.github/workflows/android.yml
+app/
+build.gradle.kts
+gradle.properties
+settings.gradle.kts
+README-ANDROID-APK-INTEGRATION.md
+```
+
+Luego:
+
+1. GitHub → Actions.
+2. Build Control Financiero APK.
+3. Run workflow.
+4. Esperar el resultado.
+5. Si termina verde, abrir Artifacts.
+6. Descargar `Control-Financiero-APK`.
+
+No ejecutes `sdkmanager` manualmente.
+No agregues `android-actions/setup-android`.
+No cambies el proyecto web ni Supabase.
+
+## Release
+
+Para publicar automáticamente el APK en GitHub Releases, crea un tag:
 
 `v1.0.0`
 
-El workflow compilará el APK y lo adjuntará al Release.
+y súbelo al repositorio.
 
-## URL de descarga para el landing
+## APK
 
-Una vez creado el Release `v1.0.0`, el enlace estable puede ser:
+La compilación genera una versión debug para pruebas directas en Android.
 
-`https://github.com/p-renault/Finanzas/releases/latest/download/Control-Financiero.apk`
-
-El botón del landing debe apuntar a ese recurso **solo después de que el APK haya sido publicado en Releases**.
-
-## Seguridad y limitaciones
-
-- El APK no contiene credenciales de Supabase.
-- El APK requiere Internet.
-- Los datos permanecen en el backend existente.
-- No se modifica la aplicación web.
-- No requiere Google Play Store.
-- La instalación manual de APK requiere que Android permita instalar desde la fuente utilizada.
-
-## Estado de esta entrega
-
-Este paquete es el **proyecto Android compilable**, no un APK ya compilado. El entorno de trabajo utilizado para preparar esta entrega no dispone del Android SDK/Gradle necesario para producir y verificar un binario APK localmente. GitHub Actions queda configurado para realizar la compilación reproducible.
+Una vez validada, se puede generar una versión release firmada para distribución.
