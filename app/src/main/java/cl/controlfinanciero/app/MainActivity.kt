@@ -1,38 +1,46 @@
 package cl.controlfinanciero.app
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.OnBackPressedCallback
-import androidx.appcompat.app.AppCompatActivity
+import android.widget.FrameLayout
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
     private lateinit var webView: WebView
     private val homeUrl = "https://controlfinanciero.cl/"
+    private val handler = Handler(Looper.getMainLooper())
+    private var loginForced = false
+    private var loginAttempts = 0
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        webView = findViewById(R.id.webView)
-        configureWebView()
-        webView.loadUrl(homeUrl)
-
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack() else finish()
-            }
+        webView = WebView(this)
+        webView.setBackgroundColor(Color.WHITE)
+        webView.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        setContentView(FrameLayout(this).apply {
+            addView(webView)
         })
+
+        configureWebView()
+        if (savedInstanceState == null) webView.loadUrl(homeUrl) else webView.restoreState(savedInstanceState)
     }
 
     private fun configureWebView() {
@@ -44,24 +52,56 @@ class MainActivity : AppCompatActivity() {
         s.javaScriptCanOpenWindowsAutomatically = true
         s.setSupportMultipleWindows(false)
         s.cacheMode = WebSettings.LOAD_DEFAULT
-        s.userAgentString = s.userAgentString + " CCFAndroid/1.0"
+        s.userAgentString = s.userAgentString + " CCFAndroid/1.1"
 
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
-
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                return handleUrl(request.url.toString())
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                forceProductionLoginView()
             }
 
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = handleUrl(request.url.toString())
             @Deprecated("Deprecated in Android API 24")
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                return handleUrl(url)
-            }
+            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = handleUrl(url)
+        }
+    }
 
-            override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
-                super.onPageStarted(view, url, favicon)
+    /**
+     * The production site intentionally opens at the public landing page.
+     * For the Android app, the required first screen is the existing CCF
+     * authentication gate. We do not recreate or duplicate authentication;
+     * we simply activate the site's existing "Iniciar sesión" action.
+     */
+    private fun forceProductionLoginView() {
+        loginForced = false
+        loginAttempts = 0
+        handler.removeCallbacksAndMessages(null)
+        tryOpenExistingLogin()
+    }
+
+    private fun tryOpenExistingLogin() {
+        if (loginForced || isFinishing || isDestroyed) return
+        loginAttempts++
+
+        webView.evaluateJavascript(
+            """
+            (function(){
+              if (document.getElementById('ccf-auth-gate')) return 'auth';
+              var login = document.querySelector('[data-b230-open=\"login\"]');
+              if (login) { login.click(); return 'clicked'; }
+              return 'waiting';
+            })();
+            """.trimIndent()
+        ) { result ->
+            if (result == "\"auth\"" || result == "\"clicked\"") {
+                loginForced = true
+                return@evaluateJavascript
+            }
+            if (loginAttempts < 60) {
+                handler.postDelayed({ tryOpenExistingLogin() }, 250L)
             }
         }
     }
@@ -78,5 +118,22 @@ class MainActivity : AppCompatActivity() {
         } catch (_: ActivityNotFoundException) {
             true
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        webView.saveState(outState)
+        super.onSaveInstanceState(outState)
+    }
+
+    @Deprecated("Deprecated in Android API 33")
+    override fun onBackPressed() {
+        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        webView.stopLoading()
+        webView.destroy()
+        super.onDestroy()
     }
 }
