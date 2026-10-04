@@ -32,7 +32,7 @@ class MainActivity : Activity() {
         setContentView(webView)
         configureWebView()
 
-        // B3.0: the APK entry point is the REAL CCF login engine.
+        // B3.1: the APK entry point is the REAL CCF login engine.
         // It never loads the production landing as its first document.
         startAtRealCCFLogin()
     }
@@ -133,9 +133,9 @@ class MainActivity : Activity() {
                 style=document.createElement('style');
                 style.id='ccf-android-compact-style';
                 style.textContent=`
-                  #app{zoom:.92 !important;}
+                  #app{zoom:1 !important;width:100% !important;}
                   @supports not (zoom:.92){
-                    #app{transform:scale(.92);transform-origin:top left;width:108.696% !important;}
+                    #app{transform:none;transform-origin:top left;width:100% !important;}
                   }
                 `;
                 document.head.appendChild(style);
