@@ -133,9 +133,9 @@ class MainActivity : Activity() {
                 style=document.createElement('style');
                 style.id='ccf-android-compact-style';
                 style.textContent=`
-                  #app{zoom:.90 !important;width:111.111111% !important;}
-                  @supports not (zoom:.90){
-                    #app{transform:scaleY(.90);transform-origin:top center;width:100% !important;}
+                  #app{zoom:.70 !important;width:95% !important;height:75vh !important;}
+                  @supports not (zoom:.70){
+                    #app{transform:scale(.70);transform-origin:top left;width:95% !important;height:75vh !important;}
                   }
                 `;
                 document.head.appendChild(style);
