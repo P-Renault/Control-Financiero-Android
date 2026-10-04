@@ -26,6 +26,7 @@ class MainActivity : Activity() {
     private var bootAttempts = 0
     private var pageReady = false
     private var bootInProgress = false
+    private var loginGateSeen = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -133,10 +134,10 @@ class MainActivity : Activity() {
                       display:flex;align-items:center;justify-content:center;
                       background:#050b14;color:#fff;font:600 15px system-ui;
                     }
-                    #app.ccf-android-compact{zoom:.92 !important;}
-                    @supports not (zoom:.92){
+                    #app.ccf-android-compact{zoom:.88 !important;}
+                    @supports not (zoom:.88){
                       #app.ccf-android-compact{
-                        transform:scale(.92);transform-origin:top left;width:108.696%;
+                        transform:scale(.88);transform-origin:top left;width:113.637%;
                       }
                     }
                   `;
@@ -213,16 +214,20 @@ class MainActivity : Activity() {
                 return 'login';
               }
 
-              if(app && !appHidden){
+              // IMPORTANT: before the real CCF login portal has appeared, the
+              // production HTML may expose #app as part of the landing page.
+              // That is NOT an authenticated session. Never reveal the WebView
+              // at this stage. We only allow #app after the real auth gate has
+              // been observed at least once during this APK session.
+              if(app && !appHidden && loginGateSeen){
                 if(loading) loading.remove();
                 document.body.classList.remove('ccf-android-startup-lock');
                 app.classList.add('ccf-android-compact');
                 return 'app';
               }
 
-              // No login gate and no visible app normally means the production
-              // landing page is showing (for example after logout). The native
-              // side will re-boot the REAL auth portal instead of exposing it.
+              // No login gate yet, or the user has logged out: keep the native
+              // WebView hidden and let the real CCF auth boot create the login.
               return 'landing';
             })();
             """.trimIndent(),
@@ -230,6 +235,7 @@ class MainActivity : Activity() {
             when (result?.trim('"')) {
                 "login", "app" -> {
                     bootInProgress = false
+                    if (result.trim('"') == "login") loginGateSeen = true
                     webView.visibility = View.VISIBLE
                     if (result.trim('"') == "app") applyCompactAfterLogin()
                 }
